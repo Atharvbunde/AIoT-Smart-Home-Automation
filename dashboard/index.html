@@ -1,0 +1,948 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#2563eb" />
+  <meta name="description" content="AIoT Smart Home Dashboard with Local AI Learning" />
+
+  <link rel="manifest" href="./manifest.json" />
+  <link rel="icon" href="./icon-192.png" type="image/png" />
+  <link rel="apple-touch-icon" href="./icon-192.png" />
+
+  <title>AIoT Smart Home Dashboard</title>
+
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: linear-gradient(135deg, #eef4ff, #f6f8fc);
+      color: #1f2937;
+    }
+    .splash {
+      position: fixed;
+      inset: 0;
+      background: linear-gradient(135deg, #10203a, #1e3a8a, #2563eb);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      animation: splashFadeOut 1s ease 2.5s forwards;
+    }
+    .splash-card { text-align: center; padding: 32px 22px; animation: popIn 0.8s ease; }
+    .splash-title { font-size: 34px; font-weight: 900; margin-bottom: 12px; }
+    .splash-sub { font-size: 18px; margin-bottom: 8px; opacity: 0.95; }
+    .splash-team { font-size: 16px; opacity: 0.9; line-height: 1.7; }
+    @keyframes popIn { from { transform: scale(0.85); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+    @keyframes splashFadeOut { to { opacity: 0; visibility: hidden; pointer-events: none; } }
+
+    .app { max-width: 1250px; margin: 0 auto; padding: 16px; }
+    .hero {
+      background: linear-gradient(135deg, #1d4ed8, #2563eb, #3b82f6);
+      color: #fff;
+      border-radius: 24px;
+      padding: 22px 20px;
+      box-shadow: 0 10px 28px rgba(37, 99, 235, 0.22);
+      margin-bottom: 16px;
+    }
+    .hero h1 { margin: 0 0 8px; font-size: 30px; }
+    .hero p { margin: 0; opacity: 0.94; line-height: 1.6; font-size: 15px; }
+    .top-status { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-top: 16px; }
+    .mini-card {
+      background: rgba(255,255,255,0.14);
+      border: 1px solid rgba(255,255,255,0.16);
+      backdrop-filter: blur(8px);
+      border-radius: 18px;
+      padding: 14px;
+    }
+    .mini-label { font-size: 13px; opacity: 0.85; margin-bottom: 6px; }
+    .mini-value { font-size: 20px; font-weight: 900; word-break: break-word; }
+    .tabs { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }
+    .tab-btn {
+      border: none;
+      border-radius: 14px;
+      background: #dbeafe;
+      color: #1d4ed8;
+      padding: 12px 16px;
+      font-size: 14px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+    .tab-btn.active { background: #2563eb; color: #fff; }
+    .page { display: none; }
+    .page.active { display: block; }
+    .card {
+      background: #fff;
+      border-radius: 22px;
+      padding: 18px;
+      margin-bottom: 16px;
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+    }
+    .section-title { font-size: 22px; font-weight: 900; margin-bottom: 14px; color: #0f172a; }
+    .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+    .grid-5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+    .control-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .device-box {
+      background: linear-gradient(180deg, #f8fbff, #eef4ff);
+      border: 1px solid #dbeafe;
+      border-radius: 18px;
+      padding: 14px;
+    }
+    .device-title { font-size: 18px; font-weight: 900; margin-bottom: 12px; color: #1e3a8a; }
+    .btn-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+    button { border: none; border-radius: 14px; padding: 11px 10px; font-size: 14px; font-weight: 900; cursor: pointer; }
+    .btn-blue { background: #2563eb; color: #fff; }
+    .btn-orange { background: #f59e0b; color: #fff; }
+    .btn-green { background: #16a34a; color: #fff; }
+    .btn-red { background: #dc2626; color: #fff; }
+    .btn-purple { background: #7c3aed; color: #fff; }
+    .btn-dark { background: #1f2937; color: #fff; }
+    .btn-teal { background: #0f766e; color: #fff; }
+    label { display: block; margin-bottom: 6px; font-weight: 800; color: #334155; }
+    input, select, textarea {
+      width: 100%; padding: 12px; border: 1px solid #d7dce5; border-radius: 12px; font-size: 15px; background: #fff;
+    }
+    textarea { min-height: 120px; resize: vertical; }
+    .status-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .status-box {
+      background: linear-gradient(180deg, #ffffff, #f8fbff);
+      border: 1px solid #e2e8f0;
+      border-radius: 18px;
+      padding: 14px;
+      min-height: 118px;
+    }
+    .status-label { font-size: 13px; color: #64748b; margin-bottom: 8px; }
+    .status-value { font-size: 22px; font-weight: 900; color: #0f172a; }
+    .sub-value { margin-top: 8px; font-size: 12px; color: #475569; line-height: 1.55; }
+    .connected { color: #16a34a; font-weight: 900; }
+    .disconnected { color: #dc2626; font-weight: 900; }
+    .parsed-box, .log-box, .reason-box {
+      margin-top: 12px;
+      padding: 12px;
+      border-radius: 14px;
+      background: #f4f7fb;
+      font-size: 14px;
+      line-height: 1.6;
+      border: 1px solid #e2e8f0;
+      max-height: 280px;
+      overflow: auto;
+    }
+    .menu-note { background: #eff6ff; border: 1px solid #bfdbfe; color: #1d4ed8; border-radius: 14px; padding: 12px; font-size: 14px; line-height: 1.6; margin-bottom: 14px; }
+    .warn-note { background: #fff7ed; border: 1px solid #fdba74; color: #9a3412; border-radius: 14px; padding: 12px; font-size: 14px; line-height: 1.6; margin-bottom: 14px; }
+    .ai-score {
+      font-size: 48px;
+      font-weight: 900;
+      color: #2563eb;
+      margin: 10px 0;
+    }
+    .bar-wrap { width: 100%; height: 16px; background: #e5e7eb; border-radius: 999px; overflow: hidden; }
+    .bar { height: 100%; width: 0%; background: #2563eb; border-radius: 999px; transition: width 0.3s ease; }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; background: #fff; }
+    th, td { text-align: left; padding: 12px 10px; border-bottom: 1px solid #e5e7eb; font-size: 14px; }
+    th { background: #eef4ff; color: #1e3a8a; font-weight: 900; }
+    @media (max-width: 1100px) {
+      .top-status { grid-template-columns: repeat(2, 1fr); }
+      .control-grid { grid-template-columns: repeat(2, 1fr); }
+      .status-grid { grid-template-columns: repeat(2, 1fr); }
+      .grid-5 { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 820px) {
+      .grid-5, .grid-4, .grid-3, .grid-2, .control-grid, .status-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="splash">
+    <div class="splash-card">
+      <div class="splash-title">AIoT Smart Home</div>
+      <div class="splash-sub">Local AI Learning + ESP32 Control</div>
+      <div class="splash-team">Atharv<br>Aarti<br>Athang</div>
+    </div>
+  </div>
+
+  <div class="app">
+    <div class="hero">
+      <h1>AIoT Smart Home Dashboard</h1>
+      <p>AIoT demo with two clean modes: Manual Mode for direct control and AI Mode for automatic light control using PIR + LDR sensor data.</p>
+      <div class="top-status">
+        <div class="mini-card"><div class="mini-label">MQTT</div><div class="mini-value" id="connStatus">Disconnected</div></div>
+        <div class="mini-card"><div class="mini-label">AI Brain</div><div class="mini-value" id="aiBrainStatus">OFF</div></div>
+        <div class="mini-card"><div class="mini-label">Command System</div><div class="mini-value" id="sampleCountTop">READY</div></div>
+        <div class="mini-card"><div class="mini-label">Prediction</div><div class="mini-value" id="topPrediction">--</div></div>
+        <div class="mini-card"><div class="mini-label">Timer</div><div class="mini-value" id="topTimer">--</div></div>
+      </div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab-btn active" onclick="openTab(event, 'dashboardPage')">Dashboard</button>
+      <button class="tab-btn" onclick="openTab(event, 'manualPage')">Manual</button>
+      <button class="tab-btn" onclick="openTab(event, 'aiPage')">Real AI</button>
+      <button class="tab-btn" onclick="openTab(event, 'sensorPage')">Sensors</button>
+      <button class="tab-btn" onclick="openTab(event, 'logsPage')">Logs</button>
+    </div>
+
+    <div id="dashboardPage" class="page active">
+      <div class="card">
+        <div class="section-title">MQTT Connection</div>
+        <div class="grid-3">
+          <div><label>Broker URL</label><input id="broker" value="wss://e99ba94b4eb8453f86ac243e05b95609.s1.eu.hivemq.cloud:8884/mqtt"></div>
+          <div><label>Username</label><input id="user" placeholder="Enter Username"></div>
+          <div><label>Password</label><input type="text" id="pass" placeholder="Enter Password"></div>
+        </div>
+        <div class="grid-2" style="margin-top:12px;">
+          <button class="btn-blue" onclick="connectMQTT()">Connect</button>
+          <button class="btn-orange" onclick="disconnectMQTT()">Disconnect</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="section-title">Live Appliance Status</div>
+        <div class="status-grid">
+          <div class="status-box"><div class="status-label">Light / Relay</div><div class="status-value" id="relayState">Unknown</div><div class="sub-value">Controller: <span id="relayController">--</span><br>ON Duration: <span id="relayDuration">00:00:00</span></div></div>
+          <div class="status-box"><div class="status-label">Light 1</div><div class="status-value" id="led1State">Unknown</div><div class="sub-value">Controller: <span id="led1Controller">--</span><br>ON Duration: <span id="led1Duration">00:00:00</span></div></div>
+          <div class="status-box"><div class="status-label">Light 2</div><div class="status-value" id="led2State">Unknown</div><div class="sub-value">Controller: <span id="led2Controller">--</span><br>ON Duration: <span id="led2Duration">00:00:00</span></div></div>
+          <div class="status-box"><div class="status-label">Fan 1</div><div class="status-value" id="led3State">Unknown</div><div class="sub-value">Controller: <span id="led3Controller">--</span><br>ON Duration: <span id="led3Duration">00:00:00</span></div></div>
+          <div class="status-box"><div class="status-label">Fan 2</div><div class="status-value" id="led4State">Unknown</div><div class="sub-value">Controller: <span id="led4Controller">--</span><br>ON Duration: <span id="led4Duration">00:00:00</span></div></div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="section-title">AI Decision</div>
+          <div class="ai-score" id="aiDecisionBig">--</div>
+          <div class="bar-wrap"><div class="bar" id="aiConfidenceBar"></div></div>
+          <div class="reason-box" id="aiReasonBox">Waiting for sensor data...</div>
+        </div>
+        <div class="card">
+          <div class="section-title">ESP Auto-Off Timer</div>
+          <div class="ai-score" id="aiTimerText">--</div>
+          <div class="bar-wrap"><div class="bar" id="aiTimerBar"></div></div>
+          <div class="reason-box" id="aiTimerReason">Timer starts when light is ON and no motion is detected.</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="manualPage" class="page">
+      <div class="card">
+        <div class="section-title">Manual Control</div>
+        <div class="menu-note">Manual Mode controls devices from dashboard. AI Mode controls Relay + Light 1 + Light 2 automatically. Fan 1 and Fan 2 are manual only.</div>
+        <div class="control-grid">
+          <div class="device-box"><div class="device-title">Light</div><div class="btn-row"><button class="btn-green" onclick="sendManual('relay_on','relay','on')">ON</button><button class="btn-red" onclick="sendManual('relay_off','relay','off')">OFF</button></div></div>
+          <div class="device-box"><div class="device-title">Light 1</div><div class="btn-row"><button class="btn-green" onclick="sendManual('led1_on','led1','on')">ON</button><button class="btn-red" onclick="sendManual('led1_off','led1','off')">OFF</button></div></div>
+          <div class="device-box"><div class="device-title">Light 2</div><div class="btn-row"><button class="btn-green" onclick="sendManual('led2_on','led2','on')">ON</button><button class="btn-red" onclick="sendManual('led2_off','led2','off')">OFF</button></div></div>
+          <div class="device-box"><div class="device-title">Fan 1</div><div class="btn-row"><button class="btn-green" onclick="sendManual('led3_on','led3','on')">ON</button><button class="btn-red" onclick="sendManual('led3_off','led3','off')">OFF</button></div></div>
+          <div class="device-box"><div class="device-title">Fan 2</div><div class="btn-row"><button class="btn-green" onclick="sendManual('led4_on','led4','on')">ON</button><button class="btn-red" onclick="sendManual('led4_off','led4','off')">OFF</button></div></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="section-title">Control Mode</div>
+        <div class="menu-note">Use Manual Mode for dashboard control. Use AI Mode for automatic AI decision control.</div>
+        <div class="grid-2">
+          <button class="btn-orange" onclick="sendMode('manual_mode')">MANUAL MODE</button>
+          <button class="btn-purple" onclick="sendMode('ai_mode')">AI MODE</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="section-title">Smart Command</div>
+        <textarea id="commandInput" placeholder="Examples:\nturn on light and turn off fan 1\nturn on all\nturn off light"></textarea>
+        <div class="grid-3" style="margin-top:12px;">
+          <button class="btn-blue" onclick="runInstruction()">Run Command</button>
+          <button class="btn-purple" onclick="startVoice()">🎤 Voice</button>
+          <button class="btn-dark" onclick="clearCommandBox()">Clear</button>
+        </div>
+        <div class="parsed-box"><b>Parsed Output:</b><div id="parsedOutput">--</div></div>
+      </div>
+    </div>
+
+    <div id="aiPage" class="page">
+      <div class="card">
+        <div class="section-title">Real AI + Automation Control</div>
+        <div class="menu-note">
+          This project uses simple AI-rule automation: Day = Light OFF. Night + Motion = Relay + Light 1 + Light 2 ON. Night + No Motion = OFF after delay. Fan 1 and Fan 2 remain manual demo outputs.
+        </div>
+        <div class="grid-4">
+          <button class="btn-green" onclick="enableAI(true)">Enable AI Mode</button>
+          <button class="btn-orange" onclick="enableAI(false)">Manual Mode</button>
+          <button class="btn-purple" onclick="sendRawCommand('status_request')">Check ESP32</button>
+          <button class="btn-red" onclick="sendRawCommand('all_off')">Emergency OFF</button>
+        </div>
+      </div>
+
+      <div class="grid-3">
+        <div class="card"><div class="section-title">Current Mode</div><div class="ai-score" id="sampleCount">--</div><div class="sub-value">Manual has highest priority. AI works only when AI mode is enabled.</div></div>
+        <div class="card"><div class="section-title">AI Prediction</div><div class="ai-score" id="aiPrediction">--</div><div class="sub-value">Confidence: <span id="aiConfidence">0%</span></div></div>
+        <div class="card"><div class="section-title">Last Action</div><div class="ai-score" id="aiActionStatus">Idle</div><div class="sub-value">Command: <span id="aiLastAction">--</span></div></div>
+      </div>
+
+      <div class="card">
+        <div class="section-title">Light Delay Control</div>
+        <div class="menu-note">Use this when you want the light ON for selected time. Example: 60 seconds, 5 minutes, 30 minutes.</div>
+        <div class="grid-3">
+          <div><label>Temporary Light ON Time</label><input id="delaySeconds" type="number" min="1" value="60" placeholder="Seconds"></div>
+          <button class="btn-green" onclick="startTemporaryDelay()">Start Delay</button>
+          <button class="btn-blue" onclick="setAiOffDelay()">Set AI No-Motion Delay</button>
+        </div>
+        <div class="parsed-box"><b>Delay Output:</b><div id="delayOutput">--</div></div>
+      </div>
+
+      <div class="card">
+        <div class="section-title">Real-Time Scheduling</div>
+        <div class="menu-note">Use 24-hour format internally. For 8 PM use 20. For 9 PM use 21. ESP32 uses India time from NTP.</div>
+        <div class="grid-4">
+          <div><label>Start Hour</label><input id="scheduleStartHour" type="number" min="0" max="23" value="20"></div>
+          <div><label>Duration Hours</label><input id="scheduleDuration" type="number" min="1" max="24" value="2"></div>
+          <button class="btn-green" onclick="startScheduleDuration()">Start Duration Schedule</button>
+          <button class="btn-red" onclick="clearSchedule()">Clear Schedule</button>
+        </div>
+        <div class="grid-3" style="margin-top:12px;">
+          <div><label>From Hour</label><input id="scheduleFromHour" type="number" min="0" max="23" value="20"></div>
+          <div><label>To Hour</label><input id="scheduleToHour" type="number" min="0" max="23" value="21"></div>
+          <button class="btn-purple" onclick="startScheduleRange()">Start Range Schedule</button>
+        </div>
+        <div class="parsed-box"><b>Schedule Output:</b><div id="scheduleOutput">--</div></div>
+      </div>
+
+      <div class="card">
+        <div class="section-title">Advanced Command Examples</div>
+        <div class="menu-note">You can type natural language in the Smart Command box. The dashboard converts it into ESP32 MQTT commands.</div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Type This</th><th>ESP32 Receives</th></tr></thead>
+            <tbody id="trainingTableBody">
+              <tr><td>turn on light</td><td>light_on</td></tr>
+              <tr><td>turn off fan</td><td>fan_off</td></tr>
+              <tr><td>turn on everything</td><td>all_on</td></tr>
+              <tr><td>turn off all</td><td>all_off</td></tr>
+              <tr><td>start fan 1 and light 2</td><td>led3_on;led2_on</td></tr>
+              <tr><td>switch off all lights</td><td>light_off</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div id="sensorPage" class="page">
+      <div class="card">
+        <div class="section-title">Sensor Status</div>
+        <div class="status-grid">
+          <div class="status-box"><div class="status-label">LDR</div><div class="status-value" id="ldrValue">--</div><div class="sub-value">GPIO34 analog value</div></div>
+          <div class="status-box"><div class="status-label">Motion</div><div class="status-value" id="motionValue">--</div><div class="sub-value">PIR GPIO27</div></div>
+          <div class="status-box"><div class="status-label">Night Condition</div><div class="status-value" id="nightStatus">--</div><div class="sub-value">From ESP sensor logic</div></div>
+          <div class="status-box"><div class="status-label">Mode</div><div class="status-value" id="lightModeStatus">--</div><div class="sub-value">AI / Manual only</div></div>
+          <div class="status-box"><div class="status-label">Priority</div><div class="status-value" id="priorityStatus">--</div><div class="sub-value">Current control authority</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="logsPage" class="page">
+      <div class="card">
+        <div class="section-title">Usage Log</div>
+        <div class="grid-3" style="margin-bottom:12px;">
+          <button class="btn-blue" onclick="exportCSV()">Export CSV</button>
+          <button class="btn-blue" onclick="exportXLSX()">Export Excel</button>
+          <button class="btn-orange" onclick="clearUsageLog()">Clear Usage Log</button>
+        </div>
+        <div class="table-wrap">
+          <table><thead><tr><th>Date</th><th>Device</th><th>Start</th><th>End</th><th>Seconds</th><th>Minutes</th></tr></thead><tbody id="usageTableBody"></tbody></table>
+        </div>
+      </div>
+      <div class="card"><div class="section-title">System Log</div><div class="log-box" id="systemLog">System ready...</div></div>
+    </div>
+  </div>
+
+  <script>
+    let client = null;
+    let usageLog = JSON.parse(localStorage.getItem("usageLog") || "[]");
+    let trainingData = JSON.parse(localStorage.getItem("aiTrainingData") || "[]");
+    let aiEnabled = JSON.parse(localStorage.getItem("aiEnabled") || "false");
+    let controlMode = localStorage.getItem("controlMode") || (aiEnabled ? "ai" : "manual");
+
+    const CONTROL_TOPIC = "home/control";
+    const STATUS_TOPIC = "home/status";
+    const USAGE_TOPIC = "home/usage/live";
+    const SENSORS_TOPIC = "home/sensors";
+
+    const AI_CONFIDENCE_LIMIT = 65;
+    // NOTE: ESP32 is the final controller. Dashboard only displays AI decision.
+    const AI_DECISION_GAP_MS = 3000;
+    let lastAiCommandAt = 0;
+    let lastSensorData = { ldr: 0, motion: false, night_condition: false, off_timer_sec: 0 };
+
+    const devices = {
+      relay: { label: "Light", stateEl: "relayState", controllerEl: "relayController", durationEl: "relayDuration" },
+      led1:  { label: "Light 1", stateEl: "led1State", controllerEl: "led1Controller", durationEl: "led1Duration" },
+      led2:  { label: "Light 2", stateEl: "led2State", controllerEl: "led2Controller", durationEl: "led2Duration" },
+      led3:  { label: "Fan 1", stateEl: "led3State", controllerEl: "led3Controller", durationEl: "led3Duration" },
+      led4:  { label: "Fan 2", stateEl: "led4State", controllerEl: "led4Controller", durationEl: "led4Duration" }
+    };
+
+    const deviceState = {};
+    Object.keys(devices).forEach(key => {
+      deviceState[key] = { state: "Unknown", controller: "--", onSince: null };
+    });
+
+    function openTab(evt, pageId) {
+      document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
+      document.getElementById(pageId).classList.add("active");
+      document.querySelectorAll(".tab-btn").forEach(btn => btn.classList.remove("active"));
+      evt.target.classList.add("active");
+    }
+
+    function connectMQTT() {
+      const broker = document.getElementById("broker").value.trim();
+      const user = document.getElementById("user").value.trim();
+      const pass = document.getElementById("pass").value.trim();
+
+      client = mqtt.connect(broker, {
+        username: user,
+        password: pass,
+        reconnectPeriod: 2000,
+        connectTimeout: 5000,
+        clean: true
+      });
+
+      client.on("connect", () => {
+        setConnStatus("Connected", true);
+        client.subscribe(STATUS_TOPIC);
+        client.subscribe(USAGE_TOPIC);
+        client.subscribe(SENSORS_TOPIC);
+        addSystemLog("MQTT connected.");
+        client.publish(CONTROL_TOPIC, "status_request");
+      });
+
+      client.on("reconnect", () => setConnStatus("Reconnecting...", false));
+      client.on("close", () => setConnStatus("Disconnected", false));
+      client.on("error", (err) => addSystemLog("MQTT Error: " + err.message));
+
+      client.on("message", (topic, payload) => {
+        const msg = payload.toString();
+        if (topic === STATUS_TOPIC) { try { handleStatusJson(JSON.parse(msg)); } catch { handlePlainStatus(msg); } }
+        if (topic === USAGE_TOPIC) { try { handleUsagePayload(JSON.parse(msg)); } catch {} }
+        if (topic === SENSORS_TOPIC) { try { handleSensorPayload(JSON.parse(msg)); } catch {} }
+      });
+    }
+
+    function disconnectMQTT() { if (client) client.end(); }
+
+    function setConnStatus(text, ok) {
+      const el = document.getElementById("connStatus");
+      el.textContent = text;
+      el.className = ok ? "mini-value connected" : "mini-value disconnected";
+    }
+
+    function ensureConnected(show = true) {
+      if (!client || !client.connected) {
+        if (show) addSystemLog("Please connect MQTT first.");
+        return false;
+      }
+      return true;
+    }
+
+    function sendMode(command) {
+      if (!ensureConnected()) return;
+
+      if (command === "manual_mode") {
+        controlMode = "manual";
+        aiEnabled = false;
+        localStorage.setItem("controlMode", controlMode);
+        localStorage.setItem("aiEnabled", JSON.stringify(aiEnabled));
+        client.publish(CONTROL_TOPIC, "manual_mode");
+        addSystemLog("Manual Mode enabled. Dashboard manual control active.");
+      }
+
+      if (command === "ai_mode") {
+        controlMode = "ai";
+        aiEnabled = true;
+        localStorage.setItem("controlMode", controlMode);
+        localStorage.setItem("aiEnabled", JSON.stringify(aiEnabled));
+        client.publish(CONTROL_TOPIC, "ai_mode");
+        addSystemLog("AI Mode enabled. Automatic AI control active.");
+      }
+
+      refreshAIUI();
+      updateModeUI();
+    }
+
+    function sendManual(command, device, action) {
+      if (!ensureConnected()) return;
+
+      controlMode = "manual";
+      aiEnabled = false;
+      localStorage.setItem("controlMode", controlMode);
+      localStorage.setItem("aiEnabled", JSON.stringify(aiEnabled));
+
+      client.publish(CONTROL_TOPIC, command);
+      learnFromManualAction(device, action);
+      document.getElementById("parsedOutput").textContent = "MANUAL SENT + TRAINED → " + command;
+      addSystemLog("Manual Mode active. Command sent: " + command);
+      refreshAIUI();
+      updateModeUI();
+    }
+
+    function enableAI(value) {
+      aiEnabled = value;
+      controlMode = value ? "ai" : "manual";
+      localStorage.setItem("aiEnabled", JSON.stringify(aiEnabled));
+      localStorage.setItem("controlMode", controlMode);
+
+      if (client && client.connected) {
+        client.publish(CONTROL_TOPIC, value ? "ai_mode" : "manual_mode");
+      }
+
+      refreshAIUI();
+      updateModeUI();
+      addSystemLog(value ? "AI Mode enabled." : "Manual Mode enabled.");
+    }
+
+    function learnFromManualAction(device, action) {
+      const now = new Date();
+      const sample = {
+        time: now.toLocaleString(),
+        device,
+        action,
+        hour: now.getHours(),
+        ldr: Number(lastSensorData.ldr || 0),
+        motion: normalizeBool(lastSensorData.motion),
+        night: normalizeBool(lastSensorData.night_condition)
+      };
+      trainingData.unshift(sample);
+      trainingData = trainingData.slice(0, 300);
+      localStorage.setItem("aiTrainingData", JSON.stringify(trainingData));
+      renderTrainingTable();
+      refreshAIUI();
+    }
+
+    function addSyntheticDemoTraining() {
+      const now = new Date();
+      for (let i = 0; i < 7; i++) {
+        trainingData.unshift({ time: now.toLocaleString(), device: "relay", action: "on", hour: 19 + (i % 3), ldr: 1200, motion: true, night: true });
+        trainingData.unshift({ time: now.toLocaleString(), device: "relay", action: "off", hour: 23, ldr: 1400, motion: false, night: true });
+        trainingData.unshift({ time: now.toLocaleString(), device: "relay", action: "off", hour: 12, ldr: 3600, motion: true, night: false });
+      }
+      trainingData = trainingData.slice(0, 300);
+      localStorage.setItem("aiTrainingData", JSON.stringify(trainingData));
+      renderTrainingTable();
+      refreshAIUI();
+      addSystemLog("Demo AI training data added.");
+    }
+
+    function clearTrainingData() {
+      trainingData = [];
+      localStorage.setItem("aiTrainingData", JSON.stringify(trainingData));
+      renderTrainingTable();
+      refreshAIUI();
+      addSystemLog("AI training data cleared.");
+    }
+
+    function predictAI() {
+      const night = normalizeBool(lastSensorData.night_condition);
+      const mot = normalizeBool(lastSensorData.motion);
+      if (controlMode !== "ai") return { action: "manual", confidence: 100, reason: "Manual mode is selected." };
+      if (night && mot) return { action: "on", confidence: 95, reason: "AI rule: night condition + PIR motion detected, Relay + Light 1 + Light 2 ON." };
+      if (!night) return { action: "off", confidence: 90, reason: "AI rule: day condition detected by LDR, lights OFF." };
+      if (!mot) return { action: "off", confidence: 80, reason: "AI rule: no PIR motion, ESP32 waits delay then switches lights OFF." };
+      return { action: "wait", confidence: 0, reason: "Waiting for sensor data." };
+    }
+
+    function runAIControl() {
+      const result = predictAI();
+      updatePredictionUI(result);
+    }
+
+    function updatePredictionUI(result) {
+      document.getElementById("aiPrediction").textContent = result.action.toUpperCase();
+      document.getElementById("topPrediction").textContent = `${result.action.toUpperCase()} ${result.confidence}%`;
+      document.getElementById("aiConfidence").textContent = result.confidence + "%";
+      document.getElementById("aiDecisionBig").textContent = result.action.toUpperCase();
+      document.getElementById("aiConfidenceBar").style.width = result.confidence + "%";
+      document.getElementById("aiReasonBox").innerHTML = `<b>Reason:</b> ${result.reason}<br><b>AI Enabled:</b> ${aiEnabled ? "YES" : "NO"}`;
+    }
+
+    function refreshAIUI() {
+      document.getElementById("aiBrainStatus").textContent = controlMode === "ai" ? "AI" : "MANUAL";
+      const sampleEl = document.getElementById("sampleCount");
+      const sampleTopEl = document.getElementById("sampleCountTop");
+      if (sampleEl) sampleEl.textContent = controlMode === "ai" ? "AI" : "MANUAL";
+      if (sampleTopEl) sampleTopEl.textContent = "READY";
+    }
+
+    function updateModeUI() {
+      const modeText = controlMode === "ai" ? "AI MODE" : "MANUAL MODE";
+      const authorityText = controlMode === "ai" ? "AI" : "Manual";
+
+      const modeEl = document.getElementById("lightModeStatus");
+      const priorityEl = document.getElementById("priorityStatus");
+      const topPredictionEl = document.getElementById("topPrediction");
+
+      if (modeEl) modeEl.textContent = modeText;
+      if (priorityEl) priorityEl.textContent = authorityText;
+      if (topPredictionEl && controlMode === "manual") topPredictionEl.textContent = "MANUAL";
+    }
+
+    function renderTrainingTable() {
+      const tbody = document.getElementById("trainingTableBody");
+      if (!tbody) return;
+    }
+
+    function normalizeBool(v) { return v === true || v === "true" || v === "Detected"; }
+
+    function updateAiOffTimer(sensorData) {
+      const timerText = document.getElementById("aiTimerText");
+      const timerBar = document.getElementById("aiTimerBar");
+      const timerReason = document.getElementById("aiTimerReason");
+      const remaining = Number(sensorData.off_timer_sec || 0);
+      const relayOn = deviceState.relay.state === "ON";
+
+      document.getElementById("topTimer").textContent = remaining > 0 ? `${remaining}s` : "--";
+
+      if (!relayOn) {
+        timerText.textContent = "OFF";
+        timerBar.style.width = "0%";
+        timerReason.textContent = "Light is OFF.";
+        return;
+      }
+      if (normalizeBool(sensorData.motion)) {
+        timerText.textContent = "Motion";
+        timerBar.style.width = "100%";
+        timerReason.textContent = "Motion detected. Timer reset by ESP32.";
+        return;
+      }
+      if (remaining > 0) {
+        const min = Math.floor(remaining / 60);
+        const sec = remaining % 60;
+        timerText.textContent = `${min}:${String(sec).padStart(2, "0")}`;
+        timerBar.style.width = Math.min(100, (remaining / 180) * 100) + "%";
+        timerReason.textContent = "No motion. ESP32 will turn OFF after countdown.";
+        return;
+      }
+      timerText.textContent = "Turning OFF";
+      timerBar.style.width = "0%";
+      timerReason.textContent = "Timer ended.";
+    }
+
+    function handleSensorPayload(data) {
+      lastSensorData = data;
+      document.getElementById("ldrValue").textContent = data.ldr ?? "--";
+      document.getElementById("motionValue").textContent = normalizeBool(data.motion) ? "Detected" : "No";
+      document.getElementById("nightStatus").textContent = normalizeBool(data.night_condition) ? "Night" : "Day";
+      updateModeUI();
+      updateAiOffTimer(data);
+      runAIControl();
+    }
+
+    function handleStatusJson(data) {
+      const { device, state, time, controller, reason } = data;
+      if (!device || !state) return;
+      if (device === "system" || device === "esp32") {
+        addSystemLog(`System: ${state}`);
+        return;
+      }
+      if (devices[device]) {
+        applyStateChange(device, state, controller || "ESP32", time || new Date().toLocaleTimeString());
+        if (reason) addSystemLog(`${devices[device].label}: ${reason}`);
+      }
+    }
+
+    function handlePlainStatus(msg) {
+      const lower = msg.toLowerCase();
+      const map = {
+        relay_on: ["relay", "on"], relay_off: ["relay", "off"],
+        led1_on: ["led1", "on"], led1_off: ["led1", "off"],
+        led2_on: ["led2", "on"], led2_off: ["led2", "off"],
+        led3_on: ["led3", "on"], led3_off: ["led3", "off"],
+        led4_on: ["led4", "on"], led4_off: ["led4", "off"]
+      };
+      if (map[lower]) applyStateChange(map[lower][0], map[lower][1], "ESP32", new Date().toLocaleTimeString());
+    }
+
+    function applyStateChange(device, state, controller, time) {
+      const normalized = state.toUpperCase();
+      const oldState = deviceState[device].state;
+      deviceState[device].state = normalized;
+      deviceState[device].controller = controller;
+      if (normalized === "ON") {
+        if (!deviceState[device].onSince) deviceState[device].onSince = Date.now();
+      } else {
+        if (deviceState[device].onSince && oldState === "ON") pushUsageLog(device, deviceState[device].onSince, Date.now());
+        deviceState[device].onSince = null;
+      }
+      document.getElementById(devices[device].stateEl).textContent = normalized;
+      document.getElementById(devices[device].controllerEl).textContent = controller;
+    }
+
+    function handleUsagePayload(data) {
+      if (data.device && devices[data.device]) addSystemLog(`Usage update: ${devices[data.device].label} ${data.state || ""}`);
+    }
+
+    function sendRawCommand(command) {
+      if (!ensureConnected()) return;
+      client.publish(CONTROL_TOPIC, command);
+      addSystemLog("Command sent: " + command);
+    }
+
+    // ================= ADVANCED COMMAND SYSTEM =================
+    function normalizeText(text) {
+      return text.toLowerCase().replace(/,/g, " and ").replace(/\s+/g, " ").trim();
+    }
+
+    function normalizeAliases(text) {
+      return text
+        .replace(/\bswitch\b/g, "turn")
+        .replace(/\bplease\b/g, "")
+        .replace(/\beverything\b/g, "all")
+        .replace(/\ball devices\b/g, "all")
+        .replace(/\ball appliances\b/g, "all")
+        .replace(/\ball lights\b/g, "light")
+        .replace(/\blights\b/g, "light")
+        .replace(/\bfans\b/g, "fan")
+        .replace(/\bmain light\b/g, "light")
+        .replace(/\broom light\b/g, "light")
+        .replace(/\blamp\b/g, "light")
+        .replace(/\bbulb\b/g, "light")
+        .replace(/\blight1\b/g, "light 1")
+        .replace(/\blight2\b/g, "light 2")
+        .replace(/\bfan1\b/g, "fan 1")
+        .replace(/\bfan2\b/g, "fan 2")
+        .replace(/\s+/g, " ")
+        .trim();
+    }
+
+    function detectDevice(text) {
+      const t = normalizeAliases(text);
+      if (/\ball\b/.test(t)) return "all";
+      if (/\blight 1\b/.test(t)) return "led1";
+      if (/\blight 2\b/.test(t)) return "led2";
+      if (/\bfan 1\b/.test(t)) return "led3";
+      if (/\bfan 2\b/.test(t)) return "led4";
+      if (/\bfan\b/.test(t)) return "fan_group";
+      if (/\blight\b/.test(t)) return "light_group";
+      return null;
+    }
+
+    function detectAction(text) {
+      const t = normalizeAliases(text);
+      if (/\bturn on\b/.test(t) || /\bswitch on\b/.test(t) || /\bon\b/.test(t) || /\bstart\b/.test(t) || /\benable\b/.test(t)) return "on";
+      if (/\bturn off\b/.test(t) || /\bswitch off\b/.test(t) || /\boff\b/.test(t) || /\bstop\b/.test(t) || /\bdisable\b/.test(t)) return "off";
+      return null;
+    }
+
+    function splitCommandParts(text) {
+      return text.split(/\band then\b|\bthen\b|\band\b|\+/gi).map(x => x.trim()).filter(Boolean);
+    }
+
+    function generateCommand(device, action) {
+      if (!device || !action) return null;
+      if (device === "all") return action === "on" ? "all_on" : "all_off";
+      if (device === "light_group") return action === "on" ? "light_on" : "light_off";
+      if (device === "fan_group") return action === "on" ? "fan_on" : "fan_off";
+      return `${device}_${action}`;
+    }
+
+    function parseSinglePart(part, rememberedAction = null) {
+      const p = normalizeAliases(normalizeText(part));
+      const device = detectDevice(p);
+      const action = detectAction(p) || rememberedAction;
+      return { command: generateCommand(device, action), action };
+    }
+
+    function runInstruction() {
+      if (!ensureConnected()) return;
+      controlMode = "manual";
+      aiEnabled = false;
+      localStorage.setItem("controlMode", controlMode);
+      localStorage.setItem("aiEnabled", JSON.stringify(aiEnabled));
+      refreshAIUI();
+      updateModeUI();
+
+      const raw = document.getElementById("commandInput").value.trim();
+      if (!raw) return;
+
+      const cleaned = normalizeAliases(normalizeText(raw));
+      const parts = splitCommandParts(cleaned);
+      const commands = [];
+      let lastAction = detectAction(cleaned);
+
+      parts.forEach(part => {
+        const parsed = parseSinglePart(part, lastAction);
+        if (parsed.action) lastAction = parsed.action;
+        if (parsed.command) commands.push(parsed.command);
+      });
+
+      const finalCommands = commands.flatMap(c => c.split(";")).filter(Boolean);
+      if (!finalCommands.length) {
+        document.getElementById("parsedOutput").textContent = "Invalid command. Try: turn on light, turn off fan, turn on all.";
+        return;
+      }
+
+      const payload = finalCommands.join(";");
+      client.publish(CONTROL_TOPIC, payload);
+      document.getElementById("parsedOutput").innerHTML = finalCommands.map(c => `SENT → ${c}`).join("<br>");
+      document.getElementById("aiActionStatus").textContent = "Sent";
+      document.getElementById("aiLastAction").textContent = payload;
+      addSystemLog("Advanced command sent: " + payload);
+    }
+
+    function startTemporaryDelay() {
+      if (!ensureConnected()) return;
+      const sec = Number(document.getElementById("delaySeconds").value || 0);
+      if (sec <= 0) { document.getElementById("delayOutput").textContent = "Enter valid seconds."; return; }
+      const cmd = `delay_${sec}`;
+      client.publish(CONTROL_TOPIC, cmd);
+      document.getElementById("delayOutput").textContent = `SENT → ${cmd}`;
+      document.getElementById("aiActionStatus").textContent = "Delay";
+      document.getElementById("aiLastAction").textContent = cmd;
+      addSystemLog("Delay command sent: " + cmd);
+    }
+
+    function setAiOffDelay() {
+      if (!ensureConnected()) return;
+      const sec = Number(document.getElementById("delaySeconds").value || 0);
+      if (sec < 3) { document.getElementById("delayOutput").textContent = "Minimum AI no-motion delay is 3 seconds."; return; }
+      const cmd = `set_delay_${sec}`;
+      client.publish(CONTROL_TOPIC, cmd);
+      document.getElementById("delayOutput").textContent = `SENT → ${cmd}`;
+      addSystemLog("AI no-motion delay updated: " + sec + " sec");
+    }
+
+    function startScheduleDuration() {
+      if (!ensureConnected()) return;
+      const start = Number(document.getElementById("scheduleStartHour").value);
+      const duration = Number(document.getElementById("scheduleDuration").value);
+      if (start < 0 || start > 23 || duration <= 0) { document.getElementById("scheduleOutput").textContent = "Enter valid start hour and duration."; return; }
+      const cmd = `schedule_${start}_${duration}`;
+      client.publish(CONTROL_TOPIC, cmd);
+      document.getElementById("scheduleOutput").textContent = `SENT → ${cmd}`;
+      document.getElementById("aiActionStatus").textContent = "Schedule";
+      document.getElementById("aiLastAction").textContent = cmd;
+      addSystemLog("Schedule duration command sent: " + cmd);
+    }
+
+    function startScheduleRange() {
+      if (!ensureConnected()) return;
+      const from = Number(document.getElementById("scheduleFromHour").value);
+      const to = Number(document.getElementById("scheduleToHour").value);
+      if (from < 0 || from > 23 || to < 0 || to > 23) { document.getElementById("scheduleOutput").textContent = "Enter valid 0-23 hour range."; return; }
+      const cmd = `schedule_range_${from}_${to}`;
+      client.publish(CONTROL_TOPIC, cmd);
+      document.getElementById("scheduleOutput").textContent = `SENT → ${cmd}`;
+      document.getElementById("aiActionStatus").textContent = "Schedule";
+      document.getElementById("aiLastAction").textContent = cmd;
+      addSystemLog("Schedule range command sent: " + cmd);
+    }
+
+    function clearSchedule() {
+      if (!ensureConnected()) return;
+      client.publish(CONTROL_TOPIC, "schedule_clear");
+      document.getElementById("scheduleOutput").textContent = "SENT → schedule_clear";
+      document.getElementById("aiActionStatus").textContent = "Cleared";
+      document.getElementById("aiLastAction").textContent = "schedule_clear";
+      addSystemLog("Schedule cleared.");
+    }
+
+    function clearCommandBox() { document.getElementById("commandInput").value = ""; document.getElementById("parsedOutput").textContent = "--"; }
+    function startVoice() {
+      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SR) { addSystemLog("Voice works best in Chrome."); return; }
+      const rec = new SR();
+      rec.lang = "en-US";
+      rec.interimResults = false;
+      rec.maxAlternatives = 1;
+      rec.onstart = () => document.getElementById("parsedOutput").textContent = "Listening...";
+      rec.onresult = e => { document.getElementById("commandInput").value = e.results[0][0].transcript; runInstruction(); };
+      rec.onerror = e => addSystemLog("Voice error: " + e.error);
+      rec.start();
+    }
+
+    function addSystemLog(text) {
+      const box = document.getElementById("systemLog");
+      box.innerHTML = `${new Date().toLocaleTimeString()} → ${text}<br>` + box.innerHTML;
+    }
+
+    function formatDuration(ms) {
+      const totalSec = Math.max(0, Math.floor(ms / 1000));
+      const h = String(Math.floor(totalSec / 3600)).padStart(2, "0");
+      const m = String(Math.floor((totalSec % 3600) / 60)).padStart(2, "0");
+      const s = String(totalSec % 60).padStart(2, "0");
+      return `${h}:${m}:${s}`;
+    }
+
+    function updateDurations() {
+      const now = Date.now();
+      Object.keys(devices).forEach(device => {
+        document.getElementById(devices[device].durationEl).textContent = deviceState[device].onSince ? formatDuration(now - deviceState[device].onSince) : "00:00:00";
+      });
+    }
+
+    function pushUsageLog(device, startMs, endMs) {
+      const start = new Date(startMs);
+      const end = new Date(endMs);
+      const totalSec = Math.max(0, Math.floor((endMs - startMs) / 1000));
+      usageLog.unshift({
+        date: start.toISOString().slice(0, 10),
+        device: devices[device].label,
+        start: start.toLocaleTimeString("en-GB", { hour12: false }),
+        end: end.toLocaleTimeString("en-GB", { hour12: false }),
+        total: totalSec,
+        totalMinutes: +(totalSec / 60).toFixed(2)
+      });
+      localStorage.setItem("usageLog", JSON.stringify(usageLog));
+      renderUsageLog();
+    }
+
+    function renderUsageLog() {
+      const tbody = document.getElementById("usageTableBody");
+      tbody.innerHTML = "";
+      usageLog.forEach(row => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `<td>${row.date}</td><td>${row.device}</td><td>${row.start}</td><td>${row.end}</td><td>${row.total}</td><td>${row.totalMinutes}</td>`;
+        tbody.appendChild(tr);
+      });
+    }
+    function clearUsageLog() { usageLog = []; localStorage.setItem("usageLog", JSON.stringify(usageLog)); renderUsageLog(); }
+    function exportCSV() {
+      if (!usageLog.length) return;
+      let csv = "Date,Device,Start Time,End Time,Total Seconds,Total Minutes\n";
+      usageLog.forEach(r => csv += `${r.date},${r.device},${r.start},${r.end},${r.total},${r.totalMinutes}\n`);
+      const blob = new Blob([csv], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "usage_log.csv";
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+    function exportXLSX() {
+      if (!usageLog.length) return;
+      const ws = XLSX.utils.json_to_sheet(usageLog);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "UsageLog");
+      XLSX.writeFile(wb, "usage_log.xlsx");
+    }
+
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => navigator.serviceWorker.register("./service-worker.js").catch(() => {}));
+    }
+
+    renderUsageLog();
+    renderTrainingTable();
+    refreshAIUI();
+    updateModeUI();
+    updatePredictionUI({ action: "wait", confidence: 0, reason: "Waiting for sensor data." });
+
+    setInterval(() => {
+      updateDurations();
+      runAIControl();
+    }, 1000);
+  </script>
+</body>
+</html>
